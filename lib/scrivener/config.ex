@@ -13,7 +13,7 @@ defmodule Scrivener.Config do
       }
   """
 
-  defstruct [:caller, :module, :options, :page_number, :page_size]
+  defstruct [:caller, :module, :options, :page_number, :page_size, :limit, :skip]
 
   @type t :: %__MODULE__{}
 
@@ -25,15 +25,8 @@ defmodule Scrivener.Config do
   @doc false
   def new(module, defaults, options) do
     options = normalize_options(options)
-    page_number = options["page"] |> to_int(1)
 
-    %Scrivener.Config{
-      caller: Map.get(options, "caller", self()),
-      module: module,
-      options: merged_options(defaults, options),
-      page_number: page_number,
-      page_size: page_size(defaults, options)
-    }
+    get_config(module, defaults, options)
   end
 
   @doc false
@@ -42,6 +35,37 @@ defmodule Scrivener.Config do
 
     new(options["module"], [], options)
   end
+
+  defp get_config(module, defaults, options) do
+    case get_env(:scrivener, :offset_format) do
+      f when f in [:offest, :skip] ->
+        %Scrivener.Config{
+          caller: Map.get(options, "caller", self()),
+          module: module,
+          options: merged_options(defaults, options),
+          skip: options["skip"] |> to_int(1),
+          limit: limit_size(defaults, options)
+        }
+      _ ->
+        %Scrivener.Config{
+          caller: Map.get(options, "caller", self()),
+          module: module,
+          options: merged_options(defaults, options),
+          page_number: options["page"] |> to_int(1),
+          page_size: page_size(defaults, options)
+        }
+    end
+  end
+
+  defp get_env(config, key) when is_atom(config) do
+    config
+    |> Application.get_env(key)
+    |> get_value()
+  end
+
+  defp get_value({:system, var, default}), do: System.get_env(var) || default
+  defp get_value({:system, var}), do: System.get_env(var)
+  defp get_value(value), do: value
 
   defp default_page_size(defaults) do
     defaults[:page_size] || 10
@@ -67,6 +91,13 @@ defmodule Scrivener.Config do
   def page_size(defaults, opts) do
     default_page_size = default_page_size(defaults)
     requested_page_size = opts["page_size"] |> to_int(default_page_size)
+
+    min(requested_page_size, defaults[:max_page_size])
+  end
+
+  def limit_size(defaults, opts) do
+    default_page_size = default_page_size(defaults)
+    requested_page_size = opts["limit"] |> to_int(default_page_size)
 
     min(requested_page_size, defaults[:max_page_size])
   end

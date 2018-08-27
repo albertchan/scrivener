@@ -4,6 +4,8 @@ defmodule Scrivener.ConfigTest do
   alias Scrivener.Config
 
   describe "new" do
+    setup [:format_default]
+
     test "can be provided options as nil" do
       config = Config.new(:module, [], nil)
 
@@ -100,5 +102,58 @@ defmodule Scrivener.ConfigTest do
       assert config.page_number == 1
       assert config.page_size == 10
     end
+
+  end
+
+  describe "offset_format :skip" do
+    setup [:format_skip]
+
+    test "can be provided options as a keyword" do
+      config = Config.new(:module, [], skip: 2, limit: 8)
+
+      assert config.module == :module
+      assert config.skip == 2
+      assert config.limit == 8
+    end
+
+    test "can be provided options as a map" do
+      config = Config.new(:module, [], %{"skip" => 2, "limit" => 15})
+
+      assert config.module == :module
+      assert config.skip == 2
+      assert config.limit == 15
+    end
+
+    test "can be provided limit via defaults" do
+      config = Config.new(:module, [page_size: 15], %{"skip" => "2"})
+
+      assert config.module == :module
+      assert config.skip == 2
+      assert config.limit == 15
+    end
+
+    test "can be created without defaults" do
+      config = Config.new(%{"module" => :module, "skip" => "2", "limit" => "15"})
+
+      assert config.module == :module
+      assert config.skip == 2
+      assert config.limit == 15
+    end
+
+    test "defaults negative limit size and skip number appropriately" do
+      config = Config.new(%{"module" => :module, "skip" => "-15", "limit" => "-15"})
+
+      assert config.module == :module
+      assert config.skip == 1
+      assert config.limit == 10
+    end
+  end
+
+  defp format_default(_) do
+    Application.put_env(:scrivener, :offset_format, :page)
+  end
+
+  defp format_skip(_) do
+    Application.put_env(:scrivener, :offset_format, :skip)
   end
 end
